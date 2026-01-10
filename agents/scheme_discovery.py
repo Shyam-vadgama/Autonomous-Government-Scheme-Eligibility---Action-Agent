@@ -49,7 +49,8 @@ class SchemeDiscoveryAgent(BaseAgent):
             ]
         )
         
-        self.schemes_database = GOVERNMENT_SCHEMES
+        self.schemes_database = self._load_schemes_from_json()
+        
         self.category_weights = {
             "exact_match": 1.0,
             "high_priority": 0.8,
@@ -58,6 +59,45 @@ class SchemeDiscoveryAgent(BaseAgent):
             "demographic_match": 0.7,
             "geographic_match": 0.5
         }
+
+    def _load_schemes_from_json(self) -> List[Dict[str, Any]]:
+        """Load schemes from schemes.json or fallback to static DB"""
+        try:
+            import os
+            json_path = "schemes.json"
+            if os.path.exists(json_path):
+                with open(json_path, "r", encoding='utf-8') as f:
+                    raw_schemes = json.load(f)
+                
+                logger.info(f"Loaded {len(raw_schemes)} schemes from {json_path}")
+                
+                # Convert to internal format
+                processed = []
+                for i, s in enumerate(raw_schemes):
+                    processed.append({
+                        "scheme_id": f"json_{i}",
+                        "name": s.get("title", "Unknown Scheme"),
+                        "category": s.get("target_audience", "General"),
+                        "description": s.get("snippet", ""),
+                        "benefits": {"description": s.get("snippet", "")},
+                        "eligibility_criteria": {
+                            "text_description": s.get("eligibility", "")
+                        },
+                        "target_groups": [s.get("target_audience", "").lower()],
+                        # Preserve original text fields for string searching
+                        "target_audience": s.get("target_audience", ""),
+                        "eligibility": s.get("eligibility", ""),
+                        "source_url": s.get("link", ""),
+                        "apply_link": s.get("apply_link", "")
+                    })
+                return processed
+        except Exception as e:
+            logger.error(f"Failed to load schemes.json: {e}")
+        
+        # Fallback
+        logger.info("Using fallback GOVERNMENT_SCHEMES database")
+        from data.schemes_db import GOVERNMENT_SCHEMES
+        return GOVERNMENT_SCHEMES
     
     def get_system_prompt(self) -> str:
         """Get system prompt for scheme discovery"""
@@ -146,17 +186,48 @@ You should provide detailed reasoning for each scheme match and exclude clearly 
         """Filter schemes by basic eligibility criteria"""
         eligible_schemes = []
         
+        # User Type Enforcement (Student vs Farmer)
+        user_type = user_profile.get("user_type", "").lower()
+        
         for scheme in self.schemes_database:
+            # Category-based filtering logic
+            if user_type == "student":
+                # If student, exclude explicit farmer schemes
+                # Include student schemes and general schemes
+                if self._is_farmer_scheme(scheme) and not self._is_student_scheme(scheme):
+                    continue
+                
+            elif user_type == "farmer":
+                # If farmer, exclude explicit student schemes
+                if self._is_student_scheme(scheme) and not self._is_farmer_scheme(scheme):
+                    continue
+            
             if self._check_basic_eligibility(user_profile, scheme):
                 eligible_schemes.append(scheme)
         
         logger.info(f"Found {len(eligible_schemes)} potentially eligible schemes")
         return eligible_schemes
+
+    def _is_student_scheme(self, scheme: Dict[str, Any]) -> bool:
+        """Check if scheme is targeted at students"""
+        keywords = ["student", "education", "internship", "youth", "scholarship", "university", "college", "degree", "school"]
+        text = (scheme.get("target_audience", "") + " " + scheme.get("eligibility", "") + " " + scheme.get("title", "") + " " + scheme.get("name", "")).lower()
+        return any(k in text for k in keywords)
+
+    def _is_farmer_scheme(self, scheme: Dict[str, Any]) -> bool:
+        """Check if scheme is targeted at farmers"""
+        keywords = ["farmer", "agriculture", "crop", "land", "rural", "kisan", "harvest", "tractor", "seed", "fertilizer"]
+        text = (scheme.get("target_audience", "") + " " + scheme.get("eligibility", "") + " " + scheme.get("title", "") + " " + scheme.get("name", "")).lower()
+        return any(k in text for k in keywords)
     
     def _check_basic_eligibility(self, profile: Dict[str, Any], scheme: Dict[str, Any]) -> bool:
         """Check if user meets basic eligibility for a scheme"""
         criteria = scheme.get("eligibility_criteria", {})
         
+        # If criteria is just text (from JSON), we rely on relevance scoring and earlier filtering
+        if "text_description" in criteria and len(criteria) == 1:
+            return True
+
         # Check mandatory exclusions first
         exclusions = criteria.get("exclusions", [])
         if "government_employees" in exclusions and profile.get("employment_status") == "government":
@@ -231,6 +302,24 @@ You should provide detailed reasoning for each scheme match and exclude clearly 
         
         criteria = scheme.get("eligibility_criteria", {})
         
+        # Handle schemes from JSON (simple text criteria)
+        if "text_description" in criteria and len(criteria) == 1:
+            # Fallback to simple keyword scoring
+            max_score = 1.0
+            score = 0.5 # Base score
+            
+            # Boost if category/audience matches user type
+            user_type = profile.get("user_type", "").lower()
+            scheme_target = scheme.get("target_audience", "").lower()
+            
+            if user_type == "student" and "student" in scheme_target:
+                score += 0.3
+            if user_type == "farmer" and ("farmer" in scheme_target or "agri" in scheme_target or "rural" in scheme_target):
+                score += 0.3
+            
+            return min(1.0, score)
+
+        # ... rest of the original scoring logic ...
         # Income category match (high weight)
         max_score += 0.25
         if "income_category" in criteria:

@@ -15,9 +15,9 @@ from datetime import datetime
 from dotenv import load_dotenv # Import load_dotenv
 
 from main import get_government_scheme_agent, UserRequest
+from data.users_db import init_user_db, create_user, verify_user
 
 load_dotenv() # Load environment variables from .env
-
 
 
 # Pydantic models for API
@@ -38,6 +38,15 @@ class FollowUpRequest(BaseModel):
     update_message: str
     options: Dict[str, Any] = {}
 
+class UserSignupRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -64,6 +73,9 @@ async def startup_event():
     """Initialize the agent system on startup"""
     global agent_system
     
+    # Initialize User DB
+    init_user_db()
+    
     # Set quota conservation mode during startup
     os.environ["SKIP_AGENT_INIT_TEST"] = "true"
     
@@ -84,6 +96,25 @@ async def startup_event():
         print("    Web interface will continue with demonstration mode")
         # Set agent_system to None to trigger demo responses
         agent_system = None
+
+
+@app.post("/api/auth/signup")
+async def signup(request: UserSignupRequest):
+    """Register a new user"""
+    if create_user(request.name, request.email, request.phone, request.password):
+        return {"success": True, "message": "User registered successfully"}
+    else:
+        # Assuming failure is due to duplicate email for simplicity, or handle generic error
+        raise HTTPException(status_code=400, detail="Registration failed. Email might already exist.")
+
+@app.post("/api/auth/login")
+async def login(request: UserLoginRequest):
+    """Login a user"""
+    user = verify_user(request.email, request.password)
+    if user:
+        return {"success": True, "user": user}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
 @app.get("/")
@@ -282,7 +313,7 @@ async def get_available_schemes():
 # Simple HTML interface
 @app.get("/demo", response_class=HTMLResponse)
 async def demo_interface():
-    """Simple demo interface"""
+    """Simple demo interface with Login/Signup"""
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -291,11 +322,22 @@ async def demo_interface():
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f0f2f5; color: #333; }
             .container { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+            
+            /* Auth Styles */
+            .auth-container { max-width: 400px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            .auth-header { text-align: center; margin-bottom: 30px; }
+            .auth-header h2 { color: #2c5282; margin: 0; }
+            .auth-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
+            .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; color: #718096; }
+            .auth-tab.active { color: #3182ce; border-bottom: 2px solid #3182ce; margin-bottom: -2px; }
+            .auth-form { display: none; }
+            .auth-form.active { display: block; }
+            
             .header { text-align: center; color: #1a202c; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; }
             .header h1 { margin: 0; font-size: 2.5em; color: #2c5282; }
             .header p { color: #718096; margin-top: 10px; font-size: 1.1em; }
             
-            .form-group { margin-bottom: 25px; }
+            .form-group { margin-bottom: 20px; }
             label { display: block; margin-bottom: 8px; font-weight: 600; color: #4a5568; }
             textarea, input { width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: border-color 0.2s; }
             textarea:focus, input:focus { border-color: #3182ce; outline: none; box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2); }
@@ -326,10 +368,66 @@ async def demo_interface():
             .missing-alert { background-color: #fffaf0; border: 1px solid #fbd38d; color: #c05621; padding: 15px; border-radius: 6px; margin-top: 20px; }
             .missing-alert h4 { margin: 0 0 10px 0; font-size: 1em; }
             .missing-list { margin: 0; padding-left: 20px; }
+            
+            #app-container { display: none; }
         </style>
     </head>
     <body>
-        <div class="container">
+        <!-- Authentication Section -->
+        <div id="auth-container" class="auth-container">
+            <div class="auth-header">
+                <h2>Welcome</h2>
+                <p style="color: #718096; margin-top: 5px;">Sign in to continue</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <div class="auth-tab active" onclick="switchTab('login')">Login</div>
+                <div class="auth-tab" onclick="switchTab('signup')">Sign Up</div>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form active">
+                <div class="form-group">
+                    <label for="loginEmail">Email Address</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password">
+                </div>
+                <button onclick="handleLogin()" style="width: 100%;">Sign In</button>
+            </div>
+            
+            <!-- Signup Form -->
+            <div id="signup-form" class="auth-form">
+                <div class="form-group">
+                    <label for="signupName">Full Name</label>
+                    <input type="text" id="signupName" placeholder="Enter your full name">
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPhone">Phone Number</label>
+                    <input type="tel" id="signupPhone" placeholder="Enter your phone number">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="text" id="signupPassword" placeholder="Create a password (normal string)">
+                </div>
+                <button onclick="handleSignup()" style="width: 100%;">Create Account</button>
+            </div>
+            
+             <div id="auth-error" style="color: #e53e3e; text-align: center; margin-top: 15px; font-size: 0.9em;"></div>
+        </div>
+
+        <!-- Main Application (Hidden initially) -->
+        <div id="app-container" class="container">
+            <div style="text-align: right; margin-bottom: 10px;">
+                <span id="user-display" style="font-weight: 600; color: #4a5568; margin-right: 15px;"></span>
+                <button onclick="logout()" style="padding: 6px 12px; font-size: 0.9em; background-color: #cbd5e0; color: #4a5568; width: auto; display: inline-block;">Logout</button>
+            </div>
             <div class="header">
                 <h1>🇮🇳 Government Scheme Eligibility Agent</h1>
                 <p>Advanced Citizen Data Extraction & Scheme Matching</p>
@@ -341,8 +439,8 @@ async def demo_interface():
             </div>
             
             <div class="form-group">
-                <label for="userId">User ID (optional):</label>
-                <input type="text" id="userId" placeholder="Enter your user ID or leave blank for anonymous">
+                <label for="userId">User ID:</label>
+                <input type="text" id="userId" readonly style="background-color: #f7fafc; cursor: not-allowed;">
             </div>
             
             <div class="btn-container">
@@ -354,6 +452,100 @@ async def demo_interface():
         </div>
 
         <script>
+            // Auth Logic
+            function switchTab(tab) {
+                const tabs = document.querySelectorAll('.auth-tab');
+                const forms = document.querySelectorAll('.auth-form');
+                
+                tabs.forEach(t => t.classList.remove('active'));
+                forms.forEach(f => f.classList.remove('active'));
+                
+                if (tab === 'login') {
+                    tabs[0].classList.add('active');
+                    document.getElementById('login-form').classList.add('active');
+                } else {
+                    tabs[1].classList.add('active');
+                    document.getElementById('signup-form').classList.add('active');
+                }
+                document.getElementById('auth-error').textContent = '';
+            }
+            
+            async function handleLogin() {
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                const errorDiv = document.getElementById('auth-error');
+                
+                if (!email || !password) {
+                    errorDiv.textContent = "Please fill in all fields";
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        // Login Success
+                        document.getElementById('auth-container').style.display = 'none';
+                        document.getElementById('app-container').style.display = 'block';
+                        
+                        // Set User Context
+                        const user = data.user;
+                        document.getElementById('userId').value = user.id;
+                        document.getElementById('user-display').textContent = `Hello, ${user.name}`;
+                    } else {
+                        errorDiv.textContent = data.detail || "Login failed";
+                    }
+                } catch (error) {
+                    errorDiv.textContent = "Connection error";
+                }
+            }
+            
+            async function handleSignup() {
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const phone = document.getElementById('signupPhone').value;
+                const password = document.getElementById('signupPassword').value;
+                const errorDiv = document.getElementById('auth-error');
+                
+                if (!name || !email || !phone || !password) {
+                    errorDiv.textContent = "Please fill in all fields";
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/signup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, phone, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        alert("Account created successfully! Please login.");
+                        switchTab('login');
+                        // Pre-fill login email
+                        document.getElementById('loginEmail').value = email;
+                    } else {
+                        errorDiv.textContent = data.detail || "Signup failed";
+                    }
+                } catch (error) {
+                    errorDiv.textContent = "Connection error";
+                }
+            }
+
+            function logout() {
+                document.getElementById('auth-container').style.display = 'block';
+                document.getElementById('app-container').style.display = 'none';
+                document.getElementById('loginPassword').value = '';
+            }
+
             function formatValue(val) {
                 if (val === null || val === undefined) return '<span style="color: #a0aec0; font-style: italic;">Not provided</span>';
                 if (val === true) return '<span style="color: #48bb78;">Yes</span>';

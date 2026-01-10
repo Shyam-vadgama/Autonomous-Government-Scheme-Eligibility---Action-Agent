@@ -102,6 +102,13 @@ class CitizenProfileAgent(BaseAgent):
                     )
                 )
                 data = json.loads(response.text)
+                
+                # Handle case where LLM returns a list instead of a dict
+                if isinstance(data, list):
+                    if len(data) > 0:
+                        data = data[0]
+                    else:
+                        data = {}
             except Exception as e:
                 error_str = str(e)
                 logger.error(f"Gemini API Error: {error_str}")
