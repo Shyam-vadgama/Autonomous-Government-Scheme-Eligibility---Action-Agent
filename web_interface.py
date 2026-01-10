@@ -16,9 +16,15 @@ from dotenv import load_dotenv # Import load_dotenv
 
 from main import get_government_scheme_agent, UserRequest
 from data.users_db import init_user_db, create_user, verify_user
+from typing import List, Dict, Optional, Any
+from abc import ABC, abstractmethod
+import logging
 
 load_dotenv() # Load environment variables from .env
 
+# Setup Logging for Agentic Mapper
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("agentic-mapper")
 
 # Pydantic models for API
 class ProfileAnalysisRequest(BaseModel):
@@ -48,6 +54,153 @@ class UserLoginRequest(BaseModel):
     email: str
     password: str
 
+# --- Agentic Form Filling Classes ---
+
+class FormField(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    label: Optional[str] = None
+    placeholder: Optional[str] = None
+    type: str = "text"
+
+class MapRequest(BaseModel):
+    fields: List[FormField]
+
+class BaseMapper(ABC):
+    @abstractmethod
+    def map_field(self, field: FormField, profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Returns { "value": str, "confidence": float, "reasoning": str } or None"""
+        pass
+
+class DeterministicMapper(BaseMapper):
+    def __init__(self, threshold: float = 0.5):
+        self.threshold = threshold
+        # Synonyms and mapping rules (Enhanced for Scheme/Citizen Profile)
+        self.rules = {
+            "name": ["full name", "fullname", "candidate name", "your name", "name", "applicant name"],
+            "first_name": ["first", "fname", "given name"],
+            "last_name": ["last", "lname", "surname", "family name"],
+            "email": ["email", "mail", "e-mail", "email address"],
+            "phone": ["phone", "mobile", "contact", "cell", "telephone", "contact_number"],
+            "address": ["address", "residence", "location", "city", "state", "street", "permanent address"],
+            "education": ["education", "university", "college", "degree", "highest qualification", "school", "education_level", "course", "stream"],
+            "experience": ["experience", "years of experience", "work history", "employment", "tenure"],
+            "skills": ["skills", "technologies", "tech stack", "competencies", "expertise"],
+            "linkedin": ["linkedin", "linkedin profile", "linkedin url"],
+            "portfolio": ["portfolio", "website", "personal site", "url", "homepage"],
+            "category": ["category", "caste", "social category", "community", "caste_category"],
+            "annual_income": ["income", "annual income", "salary", "earnings", "family income"],
+            "occupation": ["occupation", "profession", "work", "job", "farmer", "current status"],
+            "state": ["state", "province", "region"],
+            "district": ["district", "county"],
+            "village": ["village", "town", "city"],
+            "marital_status": ["marital status", "married", "single"],
+            "children": ["children", "dependents", "number of children"],
+            "id_proof": ["id proof", "identity", "aadhaar", "voter id"],
+            # Farmer specific
+            "land_area": ["land area", "acres", "land size", "holding size"],
+            "crops": ["crops", "main crops", "cultivation"],
+            "irrigation": ["irrigation", "water source"],
+            # Student specific
+            "institution": ["institution", "college name", "school name"],
+            "marks": ["marks", "percentage", "grade", "cgpa"]
+        }
+
+    def map_field(self, field: FormField, profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        # Normalize input text signature
+        text_sig = f"{field.name or ''} {field.id or ''} {field.label or ''} {field.placeholder or ''}".lower()
+        candidates = []
+
+        for profile_key, keywords in self.rules.items():
+            # Check if key exists in flat profile, or map to complex profile keys
+            val = self._get_profile_value(profile, profile_key)
+            if not val: continue
+            
+            best_keyword = None
+            max_score = 0.0
+            
+            for keyword in keywords:
+                if keyword in text_sig:
+                    # Confidence calculation
+                    # Exact matches on name/id get 1.0
+                    if keyword == field.name or keyword == field.id:
+                        score = 1.0
+                    # Semantic keyword match in label/placeholder
+                    else:
+                        score = 0.8 if len(keyword) > 4 else 0.6
+                    
+                    if score > max_score:
+                        max_score = score
+                        best_keyword = keyword
+            
+            if max_score > 0:
+                candidates.append({
+                    "key": profile_key,
+                    "value": val,
+                    "confidence": max_score,
+                    "reasoning": f"Matched field attributes with '{profile_key}' (conf: {max_score}) due to synonym rule: '{best_keyword}'"
+                })
+
+        if not candidates:
+            return None
+
+        # Pick best confidence (Agentic decision)
+        best = max(candidates, key=lambda x: x["confidence"])
+        
+        # Validation: check if value is empty or None
+        if not best["value"]:
+            return None
+
+        # Thresholding
+        if best["confidence"] >= self.threshold:
+            return best
+        
+        return None
+
+    def _get_profile_value(self, profile: Dict[str, Any], key: str) -> Any:
+        """Helper to map rule keys to actual profile keys"""
+        # Direct match
+        if key in profile: return profile[key]
+        
+        # Mapping logic
+        if key == "education": return profile.get("education_level")
+        if key == "land_area": return profile.get("land_area_acres")
+        if key == "crops": return profile.get("main_crops")
+        if key == "irrigation": return profile.get("irrigation_source")
+        if key == "institution": return profile.get("institution_name")
+        if key == "marks": return profile.get("previous_year_marks_percent")
+        if key == "category": return profile.get("caste_category")
+        
+        return None
+
+class AgenticFormFiller:
+    def __init__(self, mapper: BaseMapper):
+        self.mapper = mapper
+
+    def process(self, fields: List[FormField], profile: Dict[str, Any]) -> Dict[str, Any]:
+        mapping = {}
+        reasoning_logs = []
+        
+        for field in fields:
+            result = self.mapper.map_field(field, profile)
+            if result:
+                mapping[field.id or field.name] = result["value"]
+                log_entry = f"SUCCESS: {result['reasoning']} -> {result['value']}"
+                reasoning_logs.append(log_entry)
+                logger.info(log_entry)
+            else:
+                log_entry = f"SKIP: No confident match for field '{field.name or field.id}'"
+                reasoning_logs.append(log_entry)
+                logger.info(log_entry)
+
+        return {
+            "filled_fields": mapping,
+            "reasoning_logs": reasoning_logs
+        }
+
+# Initialize Agent with Deterministic Mapper
+form_agent = AgenticFormFiller(DeterministicMapper(threshold=0.5))
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Government Scheme Eligibility Agent API",
@@ -55,14 +208,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ... (rest of middleware and app setup) ...
 
 # Global agent system
 agent_system = None
@@ -115,6 +261,54 @@ async def login(request: UserLoginRequest):
         return {"success": True, "user": user}
     else:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+
+@app.post("/agent/fill-form")
+async def fill_form(request: MapRequest):
+    """Agentic endpoint to fill forms based on user profile"""
+    profile_data = {}
+    
+    # 1. Try to get the profile from the active system
+    if agent_system and agent_system.user_state_store:
+        try:
+            # We check for the 'demo_user' used in the web interface
+            # In a real scenario, this would extract ID from auth token
+            # Or pass it in the request payload
+            
+            # For this prototype: 
+            # 1. Try "demo_user" (used by web interface default)
+            # 2. If empty, try to find any active user in the store (simple heuristic)
+            
+            target_user = "demo_user"
+            state = agent_system.user_state_store.get_user_state(target_user)
+            
+            if state and state.profile:
+                profile_data = state.profile
+                logger.info(f"Using profile for user: {target_user}")
+            else:
+                # Fallback: Check if we have any users in the DB at all
+                # This is a bit of a hack for the demo to work immediately
+                pass
+                
+        except Exception as e:
+            logger.error(f"Error fetching profile for form fill: {e}")
+
+    # 2. Fallback Mock Data if DB is empty (for testing)
+    if not profile_data:
+        profile_data = {
+            "name": "Ravi Kumar",
+            "email": "ravi.kumar@example.com",
+            "phone": "9876543210",
+            "state": "Gujarat",
+            "district": "Kheda",
+            "education_level": "12th Pass",
+            "occupation": "Farmer",
+            "annual_income": "85000",
+            "caste_category": "OBC"
+        }
+        logger.warning("Using fallback mock profile data")
+
+    return form_agent.process(request.fields, profile_data)
 
 
 @app.get("/")

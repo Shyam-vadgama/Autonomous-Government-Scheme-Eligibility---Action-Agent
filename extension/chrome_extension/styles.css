@@ -1,0 +1,100 @@
+/* Floating Button Styling */
+.agentic-floating-btn {
+    all: unset;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2147483647; /* Max z-index */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(4px);
+}
+
+.agentic-floating-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+    background: linear-gradient(135deg, #4338CA 0%, #3730A3 100%);
+}
+
+.agentic-floating-btn:active {
+    transform: translateY(1px);
+}
+
+/* Icon styling */
+.agentic-icon {
+    font-size: 18px;
+}
+
+/* Loading State */
+.agentic-floating-btn.loading {
+    background: #6366f1;
+    cursor: wait;
+    padding-right: 40px; /* Space for spinner */
+}
+
+.agentic-floating-btn.loading::after {
+    content: "";
+    position: absolute;
+    right: 15px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: agentic-spin 1s linear infinite;
+}
+
+@keyframes agentic-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Form Field Highlighting */
+.agentic-filled {
+    background-color: #ecfdf5 !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2) !important;
+    transition: all 0.3s ease-out;
+}
+
+/* Toast Notification */
+#agentic-toast-container {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2147483647;
+    pointer-events: none;
+}
+
+.agentic-toast {
+    background: rgba(17, 24, 39, 0.95);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(8px);
+    animation: agentic-fade-up 0.3s ease-out;
+}
+
+@keyframes agentic-fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
