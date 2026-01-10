@@ -1,0 +1,92 @@
+[
+    {
+        "title": "Svamitva Yojana",
+        "link": "https://moneyview.in/saving-schemes/list-of-government-schemes",
+        "snippet": "Svamitva Yojana was launched to establish ownership of property in rural areas using drones for mapping.",
+        "source": "MoneyView",
+        "eligibility": "Rural residential land owners in Indian villages.",
+        "target_audience": "Rural Homeowners",
+        "apply_link": "https://svamitva.nic.in/"
+    },
+    {
+        "title": "myScheme Portal",
+        "link": "https://www.myscheme.gov.in/",
+        "snippet": "An e-Marketplace for Govt. schemes where users can find schemes based on their profile.",
+        "source": "Government of India",
+        "eligibility": "All Indian citizens (varies by specific scheme selected).",
+        "target_audience": "General Public",
+        "apply_link": "https://www.myscheme.gov.in/search"
+    },
+    {
+        "title": "Deen Dayal Upadhyay – Gramin Kaushalya Yojana (DDU-GKY)",
+        "link": "https://eshram.gov.in/employment-schemes",
+        "snippet": "Focuses on rural poor youth to provide them with jobs having regular monthly wages.",
+        "source": "eShram / Ministry of Rural Development",
+        "eligibility": "Rural youth aged between 15 and 35 years.",
+        "target_audience": "Rural Youth & Job Seekers",
+        "apply_link": "http://ddugky.gov.in/apply-now"
+    },
+    {
+        "title": "Agriculture Infrastructure Fund (AIF)",
+        "link": "https://cdn.visionias.in/value_added_material/4d653-government-schemes-in-news.pdf",
+        "snippet": "Financial assistance of Rs. 1 Lakh Crore with 3% interest subvention for agri-projects.",
+        "source": "Vision IAS / Ministry of Agriculture",
+        "eligibility": "Farmers, Agri-entrepreneurs, Startups, and PACS.",
+        "target_audience": "Agricultural Sector",
+        "apply_link": "https://agriinfra.dac.gov.in/"
+    },
+    {
+        "title": "Pradhan Mantri Matru Vandana Yojana (PMMVY)",
+        "link": "https://www.indiafirstlife.com/knowledge-center/government-schemes",
+        "snippet": "Maternity benefit program providing financial support to pregnant and lactating mothers.",
+        "source": "IndiaFirst Life",
+        "eligibility": "Pregnant Women and Lactating Mothers (PW&LM) for the first child.",
+        "target_audience": "Women & Mothers",
+        "apply_link": "https://pmmvy.nic.in/"
+    },
+    {
+        "title": "PM-SVANidhi",
+        "link": "https://udyamitahelpline.com/learning/latest-government-schemes-in-india/",
+        "snippet": "Micro-credit facility for street vendors to help them resume their livelihoods.",
+        "source": "Udyamita Helpline",
+        "eligibility": "Street vendors active in urban areas on or before March 24, 2020.",
+        "target_audience": "Small Scale Vendors",
+        "apply_link": "https://pmsvanidhi.mohua.gov.in/"
+    },
+    {
+        "title": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+        "link": "https://scripbox.com/saving-schemes/government-schemes/",
+        "snippet": "Accidental insurance scheme offering a cover of Rs. 2 Lakh at a very low premium.",
+        "source": "Scripbox",
+        "eligibility": "Individuals aged 18 to 70 years with a bank account.",
+        "target_audience": "All Bank Account Holders",
+        "apply_link": "Contact your linked bank branch"
+    },
+    {
+        "title": "Atal Pension Yojana (APY)",
+        "link": "https://testbook.com/ias-preparation/indian-government-schemes",
+        "snippet": "Pension scheme focused on the unorganized sector workers to ensure old-age income.",
+        "source": "Testbook / PFRDA",
+        "eligibility": "Indian citizens aged 18 to 40 years (Non-taxpayers).",
+        "target_audience": "Unorganized Sector Workers",
+        "apply_link": "https://enps.nsdl.com/eNPS/ApyWelcome.html"
+    },
+    {
+        "title": "Pradhan Mantri Jan Dhan Yojana (PMJDY)",
+        "link": "https://en.wikipedia.org/wiki/List_of_schemes_of_the_government_of_India",
+        "snippet": "National Mission for Financial Inclusion to ensure access to financial services.",
+        "source": "Wikipedia",
+        "eligibility": "Any Indian citizen above 10 years of age can open an account.",
+        "target_audience": "Economically Weaker Sections",
+        "apply_link": "https://www.pmjdy.gov.in/account"
+    },
+    {
+        "title": "Digital India Internship Scheme",
+        "link": "https://www.india.gov.in/my-government/schemes",
+        "snippet": "Provides opportunities for students to learn about government's digital initiatives.",
+        "source": "India.gov.in",
+        "eligibility": "Indian students pursuing BE/B.Tech, ME/M.Tech, or MCA.",
+        "target_audience": "Engineering Students",
+        "apply_link": "https://meity.gov.in/internship-scheme"
+    }
+]
