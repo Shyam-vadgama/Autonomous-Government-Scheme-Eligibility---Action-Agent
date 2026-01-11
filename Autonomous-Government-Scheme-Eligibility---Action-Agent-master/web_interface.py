@@ -1,0 +1,1075 @@
+"""
+FastAPI Web Interface for Government Scheme Agent
+Provides REST API endpoints for the agent system
+"""
+import asyncio
+import uvicorn
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+import os
+from datetime import datetime
+from dotenv import load_dotenv # Import load_dotenv
+
+from main import get_government_scheme_agent, UserRequest
+from data.users_db import init_user_db, create_user, verify_user
+from typing import List, Dict, Optional, Any
+from abc import ABC, abstractmethod
+import logging
+
+load_dotenv() # Load environment variables from .env
+
+# Setup Logging for Agentic Mapper
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("agentic-mapper")
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="Government Scheme Eligibility Agent API",
+    description="AI-powered assistant for Indian government scheme applications",
+    version="1.0.0"
+)
+
+# Mount static files for mock target sites
+app.mount("/mock", StaticFiles(directory="extension/target_site_mock"), name="mock")
+
+# Configure CORS
+# Explicitly allowing the extension origins (localhost:4000)
+origins = [
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
+    "http://localhost:8001",
+    "http://127.0.0.1:8001",
+    "*" # Keep wildcard for development convenience if needed, but specific origins are safer
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Pydantic models for API
+class ProfileAnalysisRequest(BaseModel):
+    user_input: str
+# ... (rest of models)
+
+
+class SchemeApplicationRequest(BaseModel):
+    user_input: str
+    user_id: Optional[str] = "anonymous"
+    options: Dict[str, Any] = {}
+
+
+class FollowUpRequest(BaseModel):
+    user_id: str
+    update_message: str
+    options: Dict[str, Any] = {}
+
+class UserSignupRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/auth/signup")
+async def signup(request: UserSignupRequest):
+    """Register a new user"""
+    success = create_user(request.name, request.email, request.phone, request.password)
+    if success:
+        return {"success": True, "message": "User registered successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Email already registered or invalid data")
+
+@app.post("/api/auth/login")
+async def login(request: UserLoginRequest):
+    """Authenticate a user"""
+    user = verify_user(request.email, request.password)
+    if user:
+        # Convert user ID to string for consistency if needed, though it's int in DB
+        user_data = {
+            "id": str(user["id"]),
+            "name": user["name"],
+            "email": user["email"],
+            "phone": user["phone"]
+        }
+        return {"success": True, "user": user_data}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+# --- Alias Routes for Extension (Backward Compatibility) ---
+@app.post("/auth/signup")
+async def signup_alias(request: UserSignupRequest):
+    return await signup(request)
+
+@app.post("/auth/login")
+async def login_alias(request: UserLoginRequest):
+    return await login(request)
+
+# --- Agentic Form Filling Classes ---
+
+class FormField(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    label: Optional[str] = None
+    placeholder: Optional[str] = None
+    type: str = "text"
+
+class BaseMapper(ABC):
+    @abstractmethod
+    def map_field(self, field: FormField, profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Returns { "value": str, "confidence": float, "reasoning": str } or None"""
+        pass
+
+class DeterministicMapper(BaseMapper):
+    def __init__(self, threshold: float = 0.5):
+        self.threshold = threshold
+        # Synonyms and mapping rules (Enhanced for Scheme/Citizen Profile)
+        self.rules = {
+            "name": ["full name", "fullname", "candidate name", "your name", "name", "applicant name"],
+            "first_name": ["first", "fname", "given name"],
+            "last_name": ["last", "lname", "surname", "family name"],
+            "email": ["email", "mail", "e-mail", "email address"],
+            "phone": ["phone", "mobile", "contact", "cell", "telephone", "contact_number", "mobileNumber"],
+            "address": ["address", "residence", "location", "city", "state", "street", "permanent address"],
+            "education": ["education", "university", "college", "degree", "highest qualification", "school", "education_level", "course", "stream"],
+            "experience": ["experience", "years of experience", "work history", "employment", "tenure"],
+            "skills": ["skills", "technologies", "tech stack", "competencies", "expertise"],
+            "linkedin": ["linkedin", "linkedin profile", "linkedin url"],
+            "portfolio": ["portfolio", "website", "personal site", "url", "homepage"],
+            "category": ["category", "caste", "social category", "community", "caste_category"],
+            "annual_income": ["income", "annual income", "salary", "earnings", "family income", "incomeRange"],
+            "occupation": ["occupation", "profession", "work", "job", "farmer", "current status"],
+            "state": ["state", "province", "region"],
+            "district": ["district", "county"],
+            "village": ["village", "town", "city"],
+            "marital_status": ["marital status", "married", "single", "familyStatus"],
+            "children": ["children", "dependents", "number of children"],
+            "id_proof": ["id proof", "identity", "aadhaar", "voter id", "aadhaarNumber"],
+            # Farmer specific
+            "land_area": ["land area", "acres", "land size", "holding size", "landHolding"],
+            "crops": ["crops", "main crops", "cultivation", "farmingType"],
+            "irrigation": ["irrigation", "water source"],
+            # Student specific
+            "institution": ["institution", "college name", "school name"],
+            "marks": ["marks", "percentage", "grade", "cgpa"],
+            "bank_account": ["bank account", "account number", "bankAccountNumber"],
+            "ifsc": ["ifsc", "ifsc code", "ifscCode"],
+            "dob": ["dob", "date of birth", "birth date", "birthdate"],
+            "gender": ["gender", "sex"],
+            "survey_number": ["survey", "dag no", "khasra no", "land record", "survey no", "khata no"]
+        }
+
+    def map_field(self, field: FormField, profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        # Normalize input text signature
+        text_sig = f"{field.name or ''} {field.id or ''} {field.label or ''} {field.placeholder or ''}".lower()
+        candidates = []
+
+        for profile_key, keywords in self.rules.items():
+            # Check if key exists in flat profile, or map to complex profile keys
+            val = self._get_profile_value(profile, profile_key)
+            if not val: continue
+            
+            best_keyword = None
+            max_score = 0.0
+            
+            for keyword in keywords:
+                if keyword in text_sig:
+                    # Confidence calculation
+                    # Exact matches on name/id get 1.0
+                    if keyword == field.name or keyword == field.id:
+                        score = 1.0
+                    # Semantic keyword match in label/placeholder
+                    else:
+                        score = 0.8 if len(keyword) > 4 else 0.6
+                    
+                    if score > max_score:
+                        max_score = score
+                        best_keyword = keyword
+            
+            if max_score > 0:
+                candidates.append({
+                    "key": profile_key,
+                    "value": val,
+                    "confidence": max_score,
+                    "reasoning": f"Matched field attributes with '{profile_key}' (conf: {max_score}) due to synonym rule: '{best_keyword}'"
+                })
+
+        if not candidates:
+            # Try direct match with profile keys
+            for key, val in profile.items():
+                if key.lower() in text_sig and val:
+                     candidates.append({
+                        "key": key,
+                        "value": val,
+                        "confidence": 0.7,
+                        "reasoning": f"Direct profile key match: '{key}'"
+                    })
+
+        if not candidates:
+            return None
+
+        # Pick best confidence (Agentic decision)
+        best = max(candidates, key=lambda x: x["confidence"])
+        
+        # Validation: check if value is empty or None
+        if not best["value"]:
+            return None
+
+        # Thresholding
+        if best["confidence"] >= self.threshold:
+            return best
+        
+        return None
+
+    def _get_profile_value(self, profile: Dict[str, Any], key: str) -> Any:
+        """Helper to map rule keys to actual profile keys"""
+        # Direct match (case-insensitive try)
+        for k, v in profile.items():
+            if k.lower() == key.lower():
+                return v
+        
+        # Mapping logic for variations
+        if key == "education": return profile.get("education_level") or profile.get("education")
+        if key == "land_area": return profile.get("land_area_acres") or profile.get("landHolding")
+        if key == "crops": return profile.get("main_crops") or profile.get("farmingType")
+        if key == "irrigation": return profile.get("irrigation_source")
+        if key == "institution": return profile.get("institution_name") or profile.get("institution")
+        if key == "marks": return profile.get("previous_year_marks_percent")
+        if key == "category": return profile.get("caste_category") or profile.get("category")
+        if key == "bank_account": return profile.get("bankAccountNumber")
+        if key == "ifsc": return profile.get("ifscCode")
+        if key == "id_proof": return profile.get("aadhaarNumber")
+        if key == "phone": return profile.get("mobileNumber") or profile.get("phone")
+        if key == "dob": return profile.get("dob") or profile.get("date_of_birth")
+        if key == "gender": return profile.get("gender")
+        if key == "survey_number": return profile.get("survey_number") or profile.get("land_record_id")
+        
+        return None
+
+class AgenticFormFiller:
+    def __init__(self, mapper: BaseMapper):
+        self.mapper = mapper
+
+    def process(self, fields: List[FormField], profile: Dict[str, Any]) -> Dict[str, Any]:
+        mapping = {}
+        reasoning_logs = []
+        
+        for field in fields:
+            result = self.mapper.map_field(field, profile)
+            if result:
+                mapping[field.id or field.name] = result["value"]
+                log_entry = f"SUCCESS: {result['reasoning']} -> {result['value']}"
+                reasoning_logs.append(log_entry)
+                logger.info(log_entry)
+            else:
+                log_entry = f"SKIP: No confident match for field '{field.name or field.id}'"
+                reasoning_logs.append(log_entry)
+                logger.info(log_entry)
+
+        return {
+            "filled_fields": mapping,
+            "reasoning_logs": reasoning_logs
+        }
+
+# Initialize Agent with Deterministic Mapper
+form_agent = AgenticFormFiller(DeterministicMapper(threshold=0.5))
+
+class MapRequest(BaseModel):
+    fields: List[FormField]
+    user: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = None # Add user_id to request
+
+# ... (inside fill_form)
+
+@app.post("/agent/fill-form")
+async def fill_form(request: MapRequest):
+    """Agentic endpoint to fill forms based on authenticated user profile"""
+    profile_data = {}
+    
+    # 1. Check if user data is provided from the extension (authenticated user)
+    if request.user:
+        profile_data = request.user
+        logger.info(f"Using provided user object for: {request.user.get('name', 'Unknown')}")
+    
+    # 2. Try to get the profile from the active system using user_id
+    elif request.user_id and agent_system and agent_system.user_state_store:
+        try:
+            state = agent_system.user_state_store.get_user_state(request.user_id)
+            if state and state.profile:
+                profile_data = state.profile
+                logger.info(f"Using backend profile for user_id: {request.user_id}")
+            else:
+                logger.warning(f"No profile found for user_id: {request.user_id}")
+        except Exception as e:
+            logger.error(f"Error fetching profile for user_id {request.user_id}: {e}")
+
+    # 3. Fallback Mock Data if no user data available
+    if not profile_data:
+        profile_data = {
+            "name": "Ravi Kumar",
+            "fullName": "Ravi Kumar", # Mapping support
+            "email": "ravi.kumar@example.com",
+            "phone": "9876543210",
+            "mobileNumber": "9876543210", # Mapping support
+            "state": "Gujarat",
+            "district": "Kheda",
+            "education_level": "12th Pass",
+            "occupation": "Farmer",
+            "annual_income": "85000",
+            "caste_category": "OBC",
+            "aadhaarNumber": "123456789012",
+            "bankAccountNumber": "1234567890",
+            "ifscCode": "SBIN0001234",
+            "gender": "Male",
+            "dob": "1990-05-15",
+            "land_record_id": "SURVEY-101-A"
+        }
+        logger.warning("Using fallback mock profile data")
+
+    return form_agent.process(request.fields, profile_data)
+
+
+# Global agent system instance
+agent_system = None
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the agent system on startup"""
+    global agent_system
+    
+    # Initialize User DB
+    init_user_db()
+    
+    # Set quota conservation mode during startup
+    os.environ["SKIP_AGENT_INIT_TEST"] = "true"
+    
+    try:
+        agent_system = get_government_scheme_agent()
+        success = await agent_system.initialize_system()
+        
+        if success:
+            print("[SUCCESS] Government Scheme Agent system initialized successfully")
+        else:
+            print("[WARNING] Government Scheme Agent initialized with limited functionality")
+            
+    except Exception as e:
+        print(f"[ERROR] Agent system startup encountered issues: {str(e)}")
+        agent_system = None
+
+@app.get("/")
+async def root():
+    """Root endpoint with basic information"""
+    return {
+        "service": "Government Scheme Eligibility Agent",
+        "version": "1.0.0",
+        "status": "operational",
+        "ai_model": "Google Gemini",
+        "timestamp": datetime.now().isoformat(),
+        "endpoints": {
+            "analyze_profile": "/api/v1/analyze-profile",
+            "apply_scheme": "/api/v1/apply-scheme", 
+            "follow_up": "/api/v1/follow-up",
+            "status": "/api/v1/status",
+            "health": "/health"
+        }
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint with quota awareness"""
+    try:
+        if agent_system:
+            status = agent_system.get_system_status()
+            
+            # Add quota information
+            quota_info = {
+                "api_provider": "Google Gemini AI",
+                "tier": "Free Tier",
+                "daily_limit": "20 requests",
+                "reset_time": "Daily at midnight UTC"
+            }
+            
+            # Check if agents are functional
+            agent_count = len(status.get("agents", {}))
+            functional_agents = sum(1 for agent_status in status.get("agents", {}).values() 
+                                  if agent_status.get("status") in ["idle", "ready"])
+            
+            system_health = "healthy" if functional_agents == agent_count else "limited"
+            
+            return {
+                "status": system_health,
+                "system_status": status,
+                "quota_info": quota_info,
+                "agent_summary": {
+                    "total": agent_count,
+                    "functional": functional_agents,
+                    "ratio": f"{functional_agents}/{agent_count}"
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "demo_mode", 
+                "reason": "Agent system in demonstration mode (quota exhausted)",
+                "quota_info": {
+                    "api_provider": "Google Gemini AI",
+                    "tier": "Free Tier",
+                    "daily_limit": "20 requests",
+                    "current_status": "Quota Exhausted",
+                    "reset_time": "Daily at midnight UTC"
+                },
+                "available_features": ["Demo responses", "System information", "API documentation"],
+                "timestamp": datetime.now().isoformat()
+            }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "reason": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+@app.post("/api/v1/analyze-profile")
+async def analyze_profile(request: ProfileAnalysisRequest):
+    """Analyze user profile for scheme eligibility"""
+    try:
+        user_request = UserRequest(
+            user_id=request.user_id or f"user_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            request_type="update_profile",
+            user_input=request.user_input,
+            existing_profile=request.existing_profile
+        )
+        
+        response = await agent_system.process_user_request(user_request)
+        
+        return {
+            "success": response.success,
+            "user_profile": response.user_profile,
+            "next_question": response.next_question,
+            "completion_percentage": response.completion_percentage,
+            "summary": response.summary,
+            "processing_time_ms": response.processing_time_ms,
+            "confidence_score": response.confidence_score
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SchemeDiscoveryRequest(BaseModel):
+    user_id: str
+    profile: Dict[str, Any] = {}
+    options: Dict[str, Any] = {}
+
+@app.post("/api/v1/eligible-schemes")
+async def get_eligible_schemes(request: SchemeDiscoveryRequest):
+    """Find eligible schemes for an existing user profile"""
+    try:
+        user_request = UserRequest(
+            user_id=request.user_id,
+            request_type="discover_schemes",
+            user_input="", # No new input, just re-evaluate
+            existing_profile=request.profile,
+            options=request.options
+        )
+        
+        response = await agent_system.process_user_request(user_request)
+        
+        # Transform backend scheme format to match frontend expectation if needed
+        # But the frontend seems to map it already.
+        
+        return {
+            "success": response.success,
+            "user_profile": response.user_profile,
+            "discovered_schemes": response.discovered_schemes,
+            "eligibility_assessments": response.eligibility_assessments,
+            "summary": response.summary,
+            "confidence_score": response.confidence_score,
+            "processing_time_ms": response.processing_time_ms
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/apply-scheme")
+async def apply_for_schemes(request: SchemeApplicationRequest):
+    """Find schemes and create application plan"""
+    try:
+        user_request = UserRequest(
+            user_id=request.user_id or f"user_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            request_type="new_application",
+            user_input=request.user_input,
+            options=request.options
+        )
+        
+        response = await agent_system.process_user_request(user_request)
+        
+        return {
+            "success": response.success,
+            "user_profile": response.user_profile,
+            "discovered_schemes": response.discovered_schemes,
+            "eligibility_assessments": response.eligibility_assessments,
+            "action_plans": response.action_plans,
+            "summary": response.summary,
+            "recommendations": response.recommendations,
+            "next_steps": response.next_steps,
+            "confidence_score": response.confidence_score,
+            "processing_time_ms": response.processing_time_ms
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/follow-up")
+async def follow_up_application(request: FollowUpRequest):
+    """Follow up on existing application"""
+    try:
+        user_request = UserRequest(
+            user_id=request.user_id,
+            request_type="follow_up",
+            user_input=request.update_message,
+            options=request.options
+        )
+        
+        response = await agent_system.process_user_request(user_request)
+        
+        return {
+            "success": response.success,
+            "follow_up_analysis": response.follow_up_analysis,
+            "summary": response.summary,
+            "recommendations": response.recommendations,
+            "next_steps": response.next_steps,
+            "processing_time_ms": response.processing_time_ms
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/status")
+async def get_system_status():
+    """Get detailed system status"""
+    try:
+        if agent_system:
+            status = agent_system.get_system_status()
+            return status
+        else:
+            raise HTTPException(status_code=503, detail="Agent system not available")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/schemes")
+async def get_available_schemes():
+    """Get list of available government schemes"""
+    try:
+        from data.schemes_db import GOVERNMENT_SCHEMES
+        return {
+            "total_schemes": len(GOVERNMENT_SCHEMES),
+            "schemes": [
+                {
+                    "scheme_id": scheme["scheme_id"],
+                    "name": scheme["name"],
+                    "category": scheme["category"],
+                    "description": scheme["description"],
+                    "target_groups": scheme.get("target_groups", []),
+                    "status": scheme.get("status", "active")
+                }
+                for scheme in GOVERNMENT_SCHEMES
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Simple HTML interface
+@app.get("/demo", response_class=HTMLResponse)
+async def demo_interface():
+    """Simple demo interface with Login/Signup"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Government Scheme Agent Demo</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f0f2f5; color: #333; }
+            .container { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+            
+            /* Auth Styles */
+            .auth-container { max-width: 400px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            .auth-header { text-align: center; margin-bottom: 30px; }
+            .auth-header h2 { color: #2c5282; margin: 0; }
+            .auth-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
+            .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; color: #718096; }
+            .auth-tab.active { color: #3182ce; border-bottom: 2px solid #3182ce; margin-bottom: -2px; }
+            .auth-form { display: none; }
+            .auth-form.active { display: block; }
+            
+            .header { text-align: center; color: #1a202c; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 2.5em; color: #2c5282; }
+            .header p { color: #718096; margin-top: 10px; font-size: 1.1em; }
+            
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 8px; font-weight: 600; color: #4a5568; }
+            textarea, input { width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: border-color 0.2s; }
+            textarea:focus, input:focus { border-color: #3182ce; outline: none; box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2); }
+            textarea { height: 150px; resize: vertical; line-height: 1.5; }
+            
+            .btn-container { display: flex; gap: 15px; margin-top: 30px; }
+            button { flex: 1; background-color: #3182ce; color: white; padding: 14px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: background-color 0.2s; }
+            button:hover { background-color: #2b6cb0; }
+            button.secondary { background-color: #718096; }
+            button.secondary:hover { background-color: #4a5568; }
+            
+            .result { margin-top: 30px; padding: 25px; background-color: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: none; }
+            .result.loading { color: #d69e2e; font-weight: 600; text-align: center; display: block; }
+            .result.success { border-left: 5px solid #48bb78; }
+            .result.error { border-left: 5px solid #f56565; color: #c53030; }
+            
+            .profile-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-top: 20px; }
+            .profile-section { margin-bottom: 20px; }
+            .profile-section h3 { color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px; font-size: 1.1em; }
+            .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+            .data-item { background: #f8fafc; padding: 10px; border-radius: 6px; }
+            .data-label { font-size: 0.85em; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+            .data-value { font-weight: 600; color: #2d3748; word-break: break-word; }
+            .tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; margin-left: 10px; }
+            .tag.student { background-color: #ebf8ff; color: #3182ce; }
+            .tag.farmer { background-color: #f0fff4; color: #38a169; }
+            
+            .missing-alert { background-color: #fffaf0; border: 1px solid #fbd38d; color: #c05621; padding: 15px; border-radius: 6px; margin-top: 20px; }
+            .missing-alert h4 { margin: 0 0 10px 0; font-size: 1em; }
+            .missing-list { margin: 0; padding-left: 20px; }
+            
+            #app-container { display: none; }
+        </style>
+    </head>
+    <body>
+        <!-- Authentication Section -->
+        <div id="auth-container" class="auth-container">
+            <div class="auth-header">
+                <h2>Welcome</h2>
+                <p style="color: #718096; margin-top: 5px;">Sign in to continue</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <div class="auth-tab active" onclick="switchTab('login')">Login</div>
+                <div class="auth-tab" onclick="switchTab('signup')">Sign Up</div>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form active">
+                <div class="form-group">
+                    <label for="loginEmail">Email Address</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password">
+                </div>
+                <button onclick="handleLogin()" style="width: 100%;">Sign In</button>
+            </div>
+            
+            <!-- Signup Form -->
+            <div id="signup-form" class="auth-form">
+                <div class="form-group">
+                    <label for="signupName">Full Name</label>
+                    <input type="text" id="signupName" placeholder="Enter your full name">
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPhone">Phone Number</label>
+                    <input type="tel" id="signupPhone" placeholder="Enter your phone number">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="text" id="signupPassword" placeholder="Create a password (normal string)">
+                </div>
+                <button onclick="handleSignup()" style="width: 100%;">Create Account</button>
+            </div>
+            
+             <div id="auth-error" style="color: #e53e3e; text-align: center; margin-top: 15px; font-size: 0.9em;"></div>
+        </div>
+
+        <!-- Main Application (Hidden initially) -->
+        <div id="app-container" class="container">
+            <div style="text-align: right; margin-bottom: 10px;">
+                <span id="user-display" style="font-weight: 600; color: #4a5568; margin-right: 15px;"></span>
+                <button onclick="logout()" style="padding: 6px 12px; font-size: 0.9em; background-color: #cbd5e0; color: #4a5568; width: auto; display: inline-block;">Logout</button>
+            </div>
+            <div class="header">
+                <h1>🇮🇳 Government Scheme Eligibility Agent</h1>
+                <p>Advanced Citizen Data Extraction & Scheme Matching</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="userInput">Describe your profile (Student or Farmer):</label>
+                <textarea id="userInput" placeholder="Example: My name is Rajesh, I am a 20 year old student pursuing B.Tech in Computer Science at a private college in Pune. My father is a farmer with 3 acres of land..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="userId">User ID:</label>
+                <input type="text" id="userId" readonly style="background-color: #f7fafc; cursor: not-allowed;">
+            </div>
+            
+            <div class="btn-container">
+                <button onclick="analyzeProfile()" class="secondary">Extract Profile Data</button>
+                <button onclick="findSchemes()">Find Eligible Schemes</button>
+            </div>
+            
+            <div id="result" class="result"></div>
+        </div>
+
+        <script>
+            // Auth Logic
+            function switchTab(tab) {
+                const tabs = document.querySelectorAll('.auth-tab');
+                const forms = document.querySelectorAll('.auth-form');
+                
+                tabs.forEach(t => t.classList.remove('active'));
+                forms.forEach(f => f.classList.remove('active'));
+                
+                if (tab === 'login') {
+                    tabs[0].classList.add('active');
+                    document.getElementById('login-form').classList.add('active');
+                } else {
+                    tabs[1].classList.add('active');
+                    document.getElementById('signup-form').classList.add('active');
+                }
+                document.getElementById('auth-error').textContent = '';
+            }
+            
+            async function handleLogin() {
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                const errorDiv = document.getElementById('auth-error');
+                
+                if (!email || !password) {
+                    errorDiv.textContent = "Please fill in all fields";
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        // Login Success
+                        document.getElementById('auth-container').style.display = 'none';
+                        document.getElementById('app-container').style.display = 'block';
+                        
+                        // Set User Context
+                        const user = data.user;
+                        document.getElementById('userId').value = user.id;
+                        document.getElementById('user-display').textContent = `Hello, ${user.name}`;
+                    } else {
+                        errorDiv.textContent = data.detail || "Login failed";
+                    }
+                } catch (error) {
+                    errorDiv.textContent = "Connection error";
+                }
+            }
+            
+            async function handleSignup() {
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const phone = document.getElementById('signupPhone').value;
+                const password = document.getElementById('signupPassword').value;
+                const errorDiv = document.getElementById('auth-error');
+                
+                if (!name || !email || !phone || !password) {
+                    errorDiv.textContent = "Please fill in all fields";
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/signup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, phone, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        alert("Account created successfully! Please login.");
+                        switchTab('login');
+                        // Pre-fill login email
+                        document.getElementById('loginEmail').value = email;
+                    } else {
+                        errorDiv.textContent = data.detail || "Signup failed";
+                    }
+                } catch (error) {
+                    errorDiv.textContent = "Connection error";
+                }
+            }
+
+            function logout() {
+                document.getElementById('auth-container').style.display = 'block';
+                document.getElementById('app-container').style.display = 'none';
+                document.getElementById('loginPassword').value = '';
+            }
+
+            function formatValue(val) {
+                if (val === null || val === undefined) return '<span style="color: #a0aec0; font-style: italic;">Not provided</span>';
+                if (val === true) return '<span style="color: #48bb78;">Yes</span>';
+                if (val === false) return '<span style="color: #e53e3e;">No</span>';
+                return val;
+            }
+
+            function renderProfileSection(title, data, fields) {
+                let html = `<div class="profile-section"><h3>${title}</h3><div class="data-grid">`;
+                fields.forEach(field => {
+                    if (data.hasOwnProperty(field)) {
+                        html += `
+                            <div class="data-item">
+                                <div class="data-label">${field.replace(/_/g, ' ')}</div>
+                                <div class="data-value">${formatValue(data[field])}</div>
+                            </div>`;
+                    }
+                });
+                html += '</div></div>';
+                return html;
+            }
+
+            async function analyzeProfile(isUpdate = false) {
+                let userInput;
+                const resultDiv = document.getElementById('result');
+                const userId = document.getElementById('userId').value || 'demo_user';
+
+                if (isUpdate) {
+                    userInput = document.getElementById('replyInput').value;
+                    if (!userInput.trim()) {
+                        alert('Please enter your answer');
+                        return;
+                    }
+                } else {
+                    userInput = document.getElementById('userInput').value;
+                    if (!userInput.trim()) {
+                        alert('Please enter your information');
+                        return;
+                    }
+                }
+                
+                resultDiv.style.display = 'block';
+                if (!isUpdate) resultDiv.className = 'result loading'; // Only show loading on full refresh or handle UI nicely
+                
+                try {
+                    // We send an empty existing_profile to force the backend to load it from the SQLite DB
+                    const response = await fetch('/api/v1/analyze-profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_input: userInput,
+                            user_id: userId,
+                            existing_profile: {} 
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const profile = data.user_profile;
+                        const userType = profile.user_type || 'Unknown';
+                        
+                        // Get completion percentage from root response or profile or calculate
+                        let calculatedPercent = 0;
+                        if (data.completion_percentage !== undefined && data.completion_percentage !== null) {
+                            calculatedPercent = data.completion_percentage;
+                        } else if (profile.completion_percentage !== undefined) {
+                            calculatedPercent = profile.completion_percentage;
+                        } else {
+                             // Fallback
+                             const missingCount = (profile.missing_fields || []).length;
+                             const estimatedTotal = userType === 'student' ? 18 : 16; 
+                             calculatedPercent = Math.max(0, Math.min(100, Math.round(((estimatedTotal - missingCount) / estimatedTotal) * 100)));
+                        }
+
+                        resultDiv.className = 'result success';
+                        let html = `
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                                <h2 style="margin: 0; color: #2d3748;">Extracted Profile</h2>
+                                <span class="tag ${userType.toLowerCase()}">${userType.toUpperCase()}</span>
+                            </div>
+                            
+                            <div style="background: #edf2f7; border-radius: 8px; height: 10px; width: 100%; margin-bottom: 20px; overflow: hidden;">
+                                <div style="background: #48bb78; width: ${calculatedPercent}%; height: 100%; transition: width 0.5s ease;"></div>
+                            </div>
+                            <div style="text-align: right; font-size: 0.85em; color: #718096; margin-top: -15px; margin-bottom: 20px;">${calculatedPercent}% Complete</div>
+                        `;
+
+                        // Next Question / Chat Interface
+                        let question = data.next_question;
+                        if (!question && profile.missing_fields && profile.missing_fields.length > 0) {
+                            question = `Please provide your ${profile.missing_fields.slice(0,3).join(', ').replace(/_/g, ' ')} to complete your profile.`;
+                        } else if (!question) {
+                             question = "Profile looks good! You can now search for schemes.";
+                        }
+
+                        html += `
+                            <div style="background: #ebf8ff; border: 1px solid #bee3f8; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; align-items: start;">
+                                <div style="font-size: 1.5em; margin-right: 15px;">🤖</div>
+                                <div>
+                                    <div style="font-weight: 600; color: #2c5282; margin-bottom: 5px;">Agent</div>
+                                    <div style="color: #2b6cb0;">${question}</div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Reply Box
+                        if (calculatedPercent < 100) {
+                             html += `
+                                <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+                                    <input type="text" id="replyInput" placeholder="Type your answer here..." style="flex: 1; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px;">
+                                    <button onclick="analyzeProfile(true)" style="flex: 0 0 auto; padding: 12px 20px;">Reply</button>
+                                </div>
+                             `;
+                        }
+
+                        // Common Fields
+                        const commonFields = ["name", "age", "gender", "state", "district", "income_range", "category", "minority", "disability"];
+                        html += renderProfileSection("Personal Details", profile, commonFields);
+                        
+                        // Type Specific Fields
+                        if (userType === 'student') {
+                            const studentFields = ["education_level", "course_name", "stream", "institution_name", "institution_type", "year_of_study", "previous_year_marks_percent", "is_hosteller"];
+                            html += renderProfileSection("Student Details", profile, studentFields);
+                        } else if (userType === 'farmer') {
+                            const farmerFields = ["owns_land", "land_area_acres", "main_crops", "irrigation_source", "has_farmer_id", "has_livestock"];
+                            html += renderProfileSection("Farmer Details", profile, farmerFields);
+                        }
+                        
+                        resultDiv.innerHTML = html;
+                        
+                        // Scroll to top of result if update
+                        if(isUpdate) resultDiv.scrollIntoView({ behavior: 'smooth' });
+                        
+                    } else {
+                        resultDiv.className = 'result error';
+                        resultDiv.textContent = data.summary || 'An unknown error occurred during profile analysis. Please check your connection or API key.';
+                    }
+                } catch (error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Network Error: Could not connect to the server. Is it running? Details: ${error.message}`;
+                }
+            }
+            
+            async function findSchemes() {
+                const userInput = document.getElementById('userInput').value;
+                const userId = document.getElementById('userId').value || 'demo_user';
+                const resultDiv = document.getElementById('result');
+                
+                if (!userInput.trim()) {
+                    alert('Please enter your information');
+                    return;
+                }
+                
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result loading';
+                resultDiv.textContent = 'Analyzing schemes based on your profile...';
+                
+                try {
+                    const response = await fetch('/api/v1/apply-scheme', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_input: userInput,
+                            user_id: userId,
+                            options: { max_schemes: 5 }
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        resultDiv.className = 'result success';
+                        
+                        // Reuse the profile display logic if possible, or just show schemes
+                        let html = `
+                            <h2 style="color: #2d3748;">Scheme Analysis Results</h2>
+                            <div class="profile-card" style="background: #f0fff4; border: 1px solid #c6f6d5;">
+                                <h3 style="color: #276749;">Summary</h3>
+                                <p>${data.summary}</p>
+                            </div>
+                        `;
+                        
+                        if (data.discovered_schemes && data.discovered_schemes.length > 0) {
+                            html += `<h3 style="margin-top: 30px;">Top Eligible Schemes</h3>`;
+                            data.discovered_schemes.forEach((scheme, index) => {
+                                html += `
+                                    <div class="profile-card">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <h4 style="margin: 0; color: #2b6cb0;">${index + 1}. ${scheme.name}</h4>
+                                            <span style="background: #ebf8ff; color: #2c5282; padding: 2px 8px; border-radius: 4px; font-size: 0.9em;">${(scheme.relevance_score * 100).toFixed(0)}% Match</span>
+                                        </div>
+                                        <p style="color: #718096; margin: 10px 0;">${scheme.description}</p>
+                                        <div style="font-size: 0.9em; color: #4a5568;">
+                                            <strong>Category:</strong> ${scheme.category}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        }
+                        
+                        if (data.recommendations && data.recommendations.length > 0) {
+                            html += `<h3 style="margin-top: 30px;">Recommendations</h3><ul>`;
+                            data.recommendations.forEach(rec => {
+                                html += `<li>${rec}</li>`;
+                            });
+                            html += `</ul>`;
+                        }
+                        
+                        resultDiv.innerHTML = html;
+                    } else {
+                        resultDiv.className = 'result error';
+                        resultDiv.textContent = data.summary || 'An unknown error occurred during scheme analysis. Please check the profile extraction first.';
+                    }
+                } catch (error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Network Error: Could not connect to the server. Is it running? Details: ${error.message}`;
+                }
+            }
+        </script>
+    </body>
+    </html>
+    """
+    return html_content
+
+
+if __name__ == "__main__":
+    # Get configuration from environment variables
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "8001"))
+    workers = int(os.getenv("WORKERS", "1"))
+    
+    # Run the server
+    uvicorn.run(
+        "web_interface:app",
+        host=host,
+        port=port,
+        workers=workers,
+        reload=False,  # Set to True for development
+        log_level="info"
+    )

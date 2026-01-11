@@ -1,0 +1,349 @@
+[
+    {
+        "scheme_id": "pmkisan_001",
+        "name": "Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)",
+        "category": "Agriculture",
+        "department": "Ministry of Agriculture & Farmers Welfare",
+        "description": "Financial support to landholding farmer families",
+        "benefits": {
+            "amount": 6000,
+            "frequency": "annual",  
+            "installments": 3,
+            "per_installment": 2000,
+            "description": "₹6,000 per year in three equal installments"
+        },
+        "eligibility_criteria": {
+            "is_farmer": true,
+            "land_ownership": true,
+            "income_category": ["bpl", "apl"],
+            "exclusions": ["income_tax_payers", "government_employees"]
+        },
+        "geographical_scope": "national",
+        "target_groups": ["farmers", "landowners"],
+        "documents_required": [
+            "aadhaar_card", "bank_account", "land_records", "passport_photo"
+        ],
+        "application_process": "online_and_offline",
+        "official_website": "http://localhost:8001/mock/pm_kisan.html",
+        "launch_year": 2019,
+        "status": "active"
+    },
+    {
+        "scheme_id": "scholarship_005",
+        "name": "Post Matric Scholarship for SC Students",
+        "category": "Education",
+        "department": "Ministry of Social Justice and Empowerment",
+        "description": "Financial assistance for SC students pursuing higher education",
+        "benefits": {
+            "maintenance_allowance": 1200,
+            "tuition_fees": "full_coverage",
+            "book_allowance": 3000,
+            "description": "Full tuition fee coverage + maintenance allowance"
+        },
+        "eligibility_criteria": {
+            "caste_category": "sc",
+            "education_level": "post_matriculation",
+            "family_income": {"max": 250000},
+            "academic_performance": "pass_marks"
+        },
+        "geographical_scope": "national",
+        "target_groups": ["sc_students", "higher_education", "student"],
+        "documents_required": [
+            "caste_certificate", "income_certificate", "academic_certificates", "bank_account"
+        ],
+        "application_process": "online_scholarship_portal",
+        "official_website": "http://localhost:8001/mock/nsp.html",
+        "launch_year": 1944,
+        "status": "active"
+    },
+    {
+        "scheme_id": "pmay_002",
+        "name": "Pradhan Mantri Awas Yojana (PMAY)",
+        "category": "Housing",
+        "department": "Ministry of Housing and Urban Affairs",
+        "description": "Housing for all by providing affordable housing",
+        "benefits": {
+            "subsidy_amount": 267000,
+            "loan_amount": 1200000,
+            "interest_subsidy": "6.5%",
+            "description": "Interest subsidy up to 6.5% on housing loans"
+        },
+        "eligibility_criteria": {
+            "annual_income": {"max": 1800000},
+            "first_time_buyer": true,
+            "no_existing_house": true
+        },
+        "geographical_scope": "national",
+        "target_groups": ["first_time_home_buyers", "middle_income"],
+        "documents_required": [
+            "aadhaar_card", "income_certificate", "bank_statement", "property_documents"
+        ],
+        "application_process": "online",
+        "official_website": "https://pmaymis.gov.in",
+        "launch_year": 2015,
+        "status": "active"
+    },
+    {
+        "scheme_id": "nrega_003",
+        "name": "Mahatma Gandhi National Rural Employment Guarantee Act (MGNREGA)",
+        "category": "Employment",
+        "department": "Ministry of Rural Development",
+        "description": "100 days of guaranteed wage employment in rural areas",
+        "benefits": {
+            "guaranteed_days": 100,
+            "daily_wage": 202,
+            "maximum_annual": 20200,
+            "description": "100 days of guaranteed wage employment"
+        },
+        "eligibility_criteria": {
+            "rural_urban": "rural",
+            "age": {"min": 18},
+            "willing_to_work": true
+        },
+        "geographical_scope": "rural_areas_only",
+        "target_groups": ["rural_unemployed", "daily_wage_workers"],
+        "documents_required": [
+            "aadhaar_card", "job_card", "bank_account"
+        ],
+        "application_process": "offline_gram_panchayat",
+        "official_website": "https://nrega.nic.in",
+        "launch_year": 2005,
+        "status": "active"
+    },
+    {
+        "scheme_id": "janani_004",
+        "name": "Janani Suraksha Yojana (JSY)",
+        "category": "Health",
+        "department": "Ministry of Health and Family Welfare",
+        "description": "Safe motherhood intervention to reduce maternal mortality",
+        "benefits": {
+            "rural_amount": 1400,
+            "urban_amount": 1000,
+            "additional_benefits": "free_delivery",
+            "description": "Cash assistance for institutional delivery"
+        },
+        "eligibility_criteria": {
+            "gender": "female",
+            "is_pregnant_lactating": true,
+            "income_category": ["bpl"],
+            "institutional_delivery": true
+        },
+        "geographical_scope": "national",
+        "target_groups": ["pregnant_women", "bpl_families"],
+        "documents_required": [
+            "aadhaar_card", "bpl_card", "pregnancy_certificate", "bank_account"
+        ],
+        "application_process": "hospital_anm",
+        "official_website": "https://nhm.gov.in",
+        "launch_year": 2005,
+        "status": "active"
+    },
+    {
+        "scheme_id": "pension_006",
+        "name": "Indira Gandhi National Old Age Pension Scheme (IGNOAPS)",
+        "category": "Social Security",
+        "department": "Ministry of Rural Development",
+        "description": "Pension support for elderly citizens",
+        "benefits": {
+            "monthly_pension": 200,
+            "annual_amount": 2400,
+            "additional_state_support": "varies",
+            "description": "Monthly pension for BPL senior citizens"
+        },
+        "eligibility_criteria": {
+            "age": {"min": 60},
+            "income_category": ["bpl"],
+            "no_government_pension": true
+        },
+        "geographical_scope": "national",
+        "target_groups": ["senior_citizens", "bpl_families"],
+        "documents_required": [
+            "age_proof", "bpl_card", "bank_account", "aadhaar_card"
+        ],
+        "application_process": "panchayat_office",
+        "official_website": "https://nsap.nic.in",
+        "launch_year": 1995,
+        "status": "active"
+    },
+    {
+        "scheme_id": "disability_007",
+        "name": "Indira Gandhi National Disability Pension Scheme (IGNDPS)",
+        "category": "Social Security",
+        "department": "Ministry of Rural Development", 
+        "description": "Pension for persons with severe/multiple disabilities",
+        "benefits": {
+            "monthly_pension": 300,
+            "annual_amount": 3600,
+            "description": "Monthly pension for persons with severe disabilities"
+        },
+        "eligibility_criteria": {
+            "disability_status": true,
+            "disability_percentage": {"min": 80},
+            "age": {"min": 18, "max": 59},
+            "income_category": ["bpl"]
+        },
+        "geographical_scope": "national",
+        "target_groups": ["disabled_persons", "bpl_families"],
+        "documents_required": [
+            "disability_certificate", "bpl_card", "bank_account", "aadhaar_card"
+        ],
+        "application_process": "panchayat_office",
+        "official_website": "https://nsap.nic.in",
+        "launch_year": 2009,
+        "status": "active"
+    },
+    {
+        "scheme_id": "ration_008",
+        "name": "National Food Security Act (NFSA)",
+        "category": "Food Security",
+        "department": "Ministry of Consumer Affairs",
+        "description": "Subsidized food grains through Public Distribution System",
+        "benefits": {
+            "rice_price_per_kg": 3,
+            "wheat_price_per_kg": 2,
+            "monthly_allocation": "5kg_per_person",
+            "description": "Highly subsidized food grains"
+        },
+        "eligibility_criteria": {
+            "income_category": ["bpl", "aay"],
+            "valid_ration_card": true
+        },
+        "geographical_scope": "national",
+        "target_groups": ["bpl_families", "aay_families"],
+        "documents_required": [
+            "ration_card", "aadhaar_card", "income_proof"
+        ],
+        "application_process": "fair_price_shop",
+        "official_website": "https://dfpd.gov.in",
+        "launch_year": 2013,
+        "status": "active"
+    },
+    {
+        "scheme_id": "pmsvanidhi_009",
+        "name": "PM-SVANidhi",
+        "category": "Employment",
+        "department": "Ministry of Housing and Urban Affairs",
+        "description": "Micro-credit facility for street vendors to help them resume their livelihoods.",
+        "benefits": {
+            "loan_amount": 10000,
+            "interest_subsidy": "7%",
+            "description": "Collateral-free working capital loan up to ₹10,000"
+        },
+        "eligibility_criteria": {
+            "occupation": "street_vendor",
+            "rural_urban": "urban",
+            "active_before": "2020-03-24"
+        },
+        "geographical_scope": "urban_areas",
+        "target_groups": ["street_vendors", "small_business"],
+        "documents_required": [
+            "vendor_id_card", "aadhaar_card", "bank_account"
+        ],
+        "application_process": "online_portal",
+        "official_website": "https://pmsvanidhi.mohua.gov.in/",
+        "launch_year": 2020,
+        "status": "active"
+    },
+    {
+        "scheme_id": "apy_010",
+        "name": "Atal Pension Yojana (APY)",
+        "category": "Social Security",
+        "department": "PFRDA",
+        "description": "Pension scheme focused on the unorganized sector workers.",
+        "benefits": {
+            "pension_amount": "1000-5000",
+            "description": "Guaranteed monthly pension of ₹1,000 to ₹5,000 after age 60"
+        },
+        "eligibility_criteria": {
+            "age": {"min": 18, "max": 40},
+            "bank_account": true,
+            "exclusions": ["income_tax_payers"]
+        },
+        "geographical_scope": "national",
+        "target_groups": ["unorganized_sector", "workers"],
+        "documents_required": [
+            "aadhaar_card", "bank_account"
+        ],
+        "application_process": "bank_branch",
+        "official_website": "https://enps.nsdl.com/eNPS/ApyWelcome.html",
+        "launch_year": 2015,
+        "status": "active"
+    },
+    {
+        "scheme_id": "pmjdy_011",
+        "name": "Pradhan Mantri Jan Dhan Yojana (PMJDY)",
+        "category": "Financial Inclusion",
+        "department": "Department of Financial Services",
+        "description": "National Mission for Financial Inclusion to ensure access to financial services.",
+        "benefits": {
+            "insurance_cover": 100000,
+            "overdraft": 10000,
+            "description": "Zero balance account with overdraft and insurance"
+        },
+        "eligibility_criteria": {
+            "citizenship": "indian",
+            "age": {"min": 10}
+        },
+        "geographical_scope": "national",
+        "target_groups": ["unbanked_population", "general_public"],
+        "documents_required": [
+            "aadhaar_card", "passport_photo"
+        ],
+        "application_process": "bank_branch_or_bank_mitra",
+        "official_website": "https://www.pmjdy.gov.in/",
+        "launch_year": 2014,
+        "status": "active"
+    },
+    {
+        "scheme_id": "di_intern_012",
+        "name": "Digital India Internship Scheme",
+        "category": "Education",
+        "department": "MeitY",
+        "description": "Provides opportunities for students to learn about government's digital initiatives.",
+        "benefits": {
+            "stipend": 10000,
+            "duration": "2 months",
+            "description": "Stipend of ₹10,000 per month"
+        },
+        "eligibility_criteria": {
+            "occupation": "student",
+            "education_stream": ["engineering", "mca", "technology"],
+            "min_marks": 60
+        },
+        "geographical_scope": "national",
+        "target_groups": ["student", "engineering_students"],
+        "documents_required": [
+            "college_id", "marksheets", "recommendation_letter"
+        ],
+        "application_process": "online",
+        "official_website": "https://meity.gov.in/internship-scheme",
+        "launch_year": 2015,
+        "status": "active"
+    },
+    {
+        "scheme_id": "ddugky_013",
+        "name": "Deen Dayal Upadhyay Grameen Kaushalya Yojana",
+        "category": "Skill Development",
+        "department": "Ministry of Rural Development",
+        "description": "Placement linked skill development scheme for rural poor youth.",
+        "benefits": {
+            "training": "free",
+            "placement": "guaranteed",
+            "description": "Free skill training and placement assistance"
+        },
+        "eligibility_criteria": {
+            "rural_urban": "rural",
+            "age": {"min": 15, "max": 35},
+            "income_category": ["bpl", "poor"]
+        },
+        "geographical_scope": "rural_areas",
+        "target_groups": ["rural_youth", "unemployed"],
+        "documents_required": [
+            "aadhaar_card", "bpl_card", "age_proof"
+        ],
+        "application_process": "training_center",
+        "official_website": "http://ddugky.gov.in/",
+        "launch_year": 2014,
+        "status": "active"
+    }
+]

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Scholarship Portal - Application</title>
+    <style>
+        body { font-family: 'Helvetica', Arial, sans-serif; background-color: #f8f9fa; padding: 20px; }
+        .container { max-width: 750px; margin: 0 auto; background: white; padding: 40px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); border-top: 4px solid #3182ce; }
+        .header { text-align: center; border-bottom: 1px solid #e2e8f0; margin-bottom: 30px; padding-bottom: 20px; }
+        .header h1 { color: #2c5282; margin: 0; font-size: 24px; }
+        .header p { color: #718096; margin-top: 5px; font-size: 14px; }
+        
+        .section-title { background-color: #ebf8ff; color: #2b6cb0; padding: 10px 15px; font-weight: bold; margin-bottom: 20px; border-left: 4px solid #2b6cb0; }
+        
+        .row { display: flex; gap: 20px; margin-bottom: 15px; }
+        .col { flex: 1; }
+        
+        label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: bold; color: #4a5568; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 3px; font-size: 14px; }
+        input:focus, select:focus { border-color: #3182ce; outline: none; }
+        
+        .btn-primary { background-color: #3182ce; color: white; border: none; padding: 10px 25px; border-radius: 3px; font-size: 14px; cursor: pointer; float: right; }
+        
+        .agent-status { position: fixed; top: 20px; right: 20px; width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-left: 4px solid #3182ce; z-index: 100; display: none; }
+        .agent-status h4 { margin: 0 0 5px 0; color: #2c5282; font-size: 14px; }
+        .agent-status p { margin: 0; font-size: 12px; color: #4a5568; }
+        .agent-loader { display: inline-block; width: 10px; height: 10px; border: 2px solid #cbd5e0; border-top-color: #3182ce; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 5px; }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="agent-overlay" class="agent-status">
+        <h4><span class="agent-loader"></span> GovAid Assistant</h4>
+        <p id="agent-msg">Detecting form fields...</p>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>National Scholarship Portal</h1>
+            <p>Fresh Application Form (AY 2025-26)</p>
+        </div>
+
+        <form id="nspForm">
+            <div class="section-title">1. Basic Details</div>
+            <div class="row">
+                <div class="col">
+                    <label for="state">State of Domicile</label>
+                    <select id="state" name="domicile_state">
+                        <option value="">Select State</option>
+                        <option value="Maharashtra">Maharashtra</option>
+                        <option value="Gujarat">Gujarat</option>
+                        <option value="Karnataka">Karnataka</option>
+                        <option value="Delhi">Delhi</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label for="category">Scholarship Category</label>
+                    <select id="category" name="scholarship_category">
+                        <option value="">Select</option>
+                        <option value="Pre Matric">Pre Matric</option>
+                        <option value="Post Matric">Post Matric</option>
+                        <option value="Merit cum Means">Merit cum Means</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <label for="studentName">Name of Student</label>
+                    <input type="text" id="studentName" name="name" placeholder="As per Aadhaar">
+                </div>
+                <div class="col">
+                    <label for="dob">Date of Birth</label>
+                    <input type="date" id="dob" name="dob">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender">
+                        <option value="">Select</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label for="mobile">Mobile Number</label>
+                    <input type="text" id="mobile" name="phone">
+                </div>
+            </div>
+
+            <div class="section-title">2. Academic Details</div>
+            <div class="row">
+                <div class="col">
+                    <label for="institute">Present Institution</label>
+                    <input type="text" id="institute" name="institution" placeholder="College/School Name">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label for="class">Present Class/Course</label>
+                    <input type="text" id="class" name="education" placeholder="e.g. B.Tech">
+                </div>
+                <div class="col">
+                    <label for="marks">Previous Year Marks (%)</label>
+                    <input type="text" id="marks" name="marks" placeholder="%">
+                </div>
+            </div>
+
+            <div class="section-title">3. Income Details</div>
+            <div class="row">
+                <div class="col">
+                    <label for="income">Annual Family Income (Rs)</label>
+                    <input type="number" id="income" name="annual_income">
+                </div>
+                <div class="col">
+                    <label for="caste">Community/Category</label>
+                    <select id="caste" name="category">
+                        <option value="">Select</option>
+                        <option value="General">General</option>
+                        <option value="OBC">OBC</option>
+                        <option value="SC">SC</option>
+                        <option value="ST">ST</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="overflow: hidden; margin-top: 20px;">
+                <button type="button" class="btn-primary">Save & Continue</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Agent Script
+        async function runAgent() {
+            const overlay = document.getElementById('agent-overlay');
+            const msg = document.getElementById('agent-msg');
+            overlay.style.display = 'block';
+
+            // Get user_id from URL query params
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+
+            // Collect fields
+            const fields = Array.from(document.querySelectorAll('input, select')).map(el => ({
+                id: el.id,
+                name: el.name,
+                label: document.querySelector(`label[for="${el.id}"]`)?.innerText || '',
+                type: el.type
+            }));
+
+            msg.textContent = 'Fetching profile from secure vault...';
+
+            try {
+                // Call Agent
+                const response = await fetch('http://localhost:8001/agent/fill-form', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        fields: fields,
+                        user_id: userId
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.filled_fields) {
+                    msg.textContent = 'Filling form with verified data...';
+                    
+                    let filled = 0;
+                    for (const [key, value] of Object.entries(data.filled_fields)) {
+                        const el = document.getElementById(key);
+                        if (el) {
+                            el.value = value;
+                            el.style.backgroundColor = '#e6fffa'; // Light green highlight
+                            filled++;
+                        }
+                    }
+                    
+                    setTimeout(() => {
+                        overlay.innerHTML = `<h4>✅ GovAid Completed</h4><p>Filled ${filled} fields automatically.</p>`;
+                        setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+                    }, 1000);
+                }
+            } catch (e) {
+                console.error(e);
+                msg.textContent = 'Connection failed.';
+            }
+        }
+
+        window.onload = () => setTimeout(runAgent, 1500);
+    </script>
+</body>
+</html>

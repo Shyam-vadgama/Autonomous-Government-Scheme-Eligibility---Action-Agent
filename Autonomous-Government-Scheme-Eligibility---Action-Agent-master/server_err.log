@@ -1,0 +1,32 @@
+[32m2026-01-11 08:52:47.019[0m | [1mINFO    [0m | [36mdata.schemes_db[0m:[36mload_schemes[0m:[36m19[0m - [1mLoaded 13 schemes from schemes.json[0m
+F:\coding\Autonomous-Government-Scheme-Eligibility---Action-Agent-master\web_interface.py:346: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [14436]
+INFO:     Waiting for application startup.
+[32m2026-01-11 08:52:49.859[0m | [1mINFO    [0m | [36mconfig.gemini_client[0m:[36m_initialize_client[0m:[36m45[0m - [1mGemini client initialized with model: gemini-2.0-flash-exp[0m
+[32m2026-01-11 08:52:49.873[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36m__init__[0m:[36m66[0m - [1mInitialized agent 'Citizen Data Extraction Agent' with ID: citizen_profile_extractor[0m
+[32m2026-01-11 08:52:49.879[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36m__init__[0m:[36m66[0m - [1mInitialized agent 'Scheme Discovery Agent' with ID: scheme_discovery[0m
+[32m2026-01-11 08:52:49.882[0m | [1mINFO    [0m | [36magents.scheme_discovery[0m:[36m__init__[0m:[36m55[0m - [1mScheme Discovery Agent loaded 13 schemes[0m
+[32m2026-01-11 08:52:49.883[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36m__init__[0m:[36m66[0m - [1mInitialized agent 'Eligibility Reasoning Agent' with ID: eligibility_reasoning[0m
+[32m2026-01-11 08:52:49.883[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36m__init__[0m:[36m66[0m - [1mInitialized agent 'Action Planner Agent' with ID: action_planner[0m
+[32m2026-01-11 08:52:49.885[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36m__init__[0m:[36m66[0m - [1mInitialized agent 'Follow-up Agent' with ID: follow_up_agent[0m
+[32m2026-01-11 08:52:49.888[0m | [1mINFO    [0m | [36mmain[0m:[36m__init__[0m:[36m99[0m - [1mGovernment Scheme Agent system initialized[0m
+[32m2026-01-11 08:52:49.889[0m | [1mINFO    [0m | [36mmain[0m:[36minitialize_system[0m:[36m104[0m - [1mInitializing Government Scheme Agent system...[0m
+[32m2026-01-11 08:52:49.889[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36minitialize[0m:[36m76[0m - [1mSkipping full initialization for Citizen Data Extraction Agent (quota conservation)[0m
+[32m2026-01-11 08:52:49.891[0m | [1mINFO    [0m | [36mmain[0m:[36m_init_agent_safe[0m:[36m164[0m - [1mAgent profile_analyzer initialized successfully[0m
+[32m2026-01-11 08:52:49.891[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36minitialize[0m:[36m76[0m - [1mSkipping full initialization for Scheme Discovery Agent (quota conservation)[0m
+[32m2026-01-11 08:52:49.892[0m | [1mINFO    [0m | [36mmain[0m:[36m_init_agent_safe[0m:[36m164[0m - [1mAgent scheme_discovery initialized successfully[0m
+[32m2026-01-11 08:52:49.893[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36minitialize[0m:[36m76[0m - [1mSkipping full initialization for Eligibility Reasoning Agent (quota conservation)[0m
+[32m2026-01-11 08:52:49.893[0m | [1mINFO    [0m | [36mmain[0m:[36m_init_agent_safe[0m:[36m164[0m - [1mAgent eligibility_reasoning initialized successfully[0m
+[32m2026-01-11 08:52:49.893[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36minitialize[0m:[36m76[0m - [1mSkipping full initialization for Action Planner Agent (quota conservation)[0m
+[32m2026-01-11 08:52:49.894[0m | [1mINFO    [0m | [36mmain[0m:[36m_init_agent_safe[0m:[36m164[0m - [1mAgent action_planner initialized successfully[0m
+[32m2026-01-11 08:52:49.894[0m | [1mINFO    [0m | [36magents.base_agent[0m:[36minitialize[0m:[36m76[0m - [1mSkipping full initialization for Follow-up Agent (quota conservation)[0m
+[32m2026-01-11 08:52:49.895[0m | [1mINFO    [0m | [36mmain[0m:[36m_init_agent_safe[0m:[36m164[0m - [1mAgent follow_up_agent initialized successfully[0m
+[32m2026-01-11 08:52:49.895[0m | [1mINFO    [0m | [36mmain[0m:[36minitialize_system[0m:[36m117[0m - [1mAll agents initialized successfully[0m
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)

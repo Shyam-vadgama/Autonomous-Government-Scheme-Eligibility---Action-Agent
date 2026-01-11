@@ -1,0 +1,8 @@
+[SUCCESS] Government Scheme Agent system initialized successfully
+INFO:     127.0.0.1:57215 - "OPTIONS /api/auth/signup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57215 - "POST /api/auth/signup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57215 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57215 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57215 - "GET /api/v1/schemes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64125 - "GET /api/v1/schemes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64125 - "GET /api/v1/schemes HTTP/1.1" 200 OK

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Auto-fill - Test Scenarios</title>
+    <style>
+        body {
+            font-family: -apple-system, blinkmacsystemfont, "Segoe UI", roboto, sans-serif;
+            background: #f9fafb;
+            color: #111827;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .section {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #1f2937;
+            border-bottom: 2px solid #f3f4f6;
+            padding-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: 8px 0;
+        }
+
+        .desc {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 Edge Case Test Suite</h1>
+
+    <div class="section">
+        <h2>1. Table-based Structure</h2>
+        <p class="desc">Tests mapping in legacy table-based layouts where labels are in different cells.</p>
+        <form id="table-form">
+            <table>
+                <tr>
+                    <td><label for="t-email">Work Email:</label></td>
+                    <td><input type="email" id="t-email"></td>
+                </tr>
+                <tr>
+                    <td><label for="t-phone">Mobile:</label></td>
+                    <td><input type="tel" id="t-phone"></td>
+                </tr>
+            </table>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>2. Duplicate Field Names</h2>
+        <p class="desc">Multiple fields with identical 'name' attributes (e.g. Home vs Work Phone).</p>
+        <form id="duplicate-form">
+            <div class="form-group">
+                <label>Primary Phone</label>
+                <input type="tel" name="phone">
+            </div>
+            <div class="form-group">
+                <label>Secondary Contact</label>
+                <input type="tel" name="phone">
+            </div>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>3. Missing / Non-mapped Fields</h2>
+        <p class="desc">A form with fields that the agent shouldn't touch (e.g. Password, Captcha).</p>
+        <form id="mixed-form">
+            <div class="form-group">
+                <label for="m-name">FullName</label>
+                <input type="text" id="m-name">
+            </div>
+            <div class="form-group">
+                <label for="m-pass">Choose Password</label>
+                <input type="password" id="m-pass" placeholder="Should stay empty">
+            </div>
+        </form>
+    </div>
+
+    <div class="section" id="dynamic-container">
+        <h2>4. Dynamic JS-Loaded Form</h2>
+        <p class="desc">Click the button below to inject a form via JS. The extension should detect it via
+            MutationObserver.</p>
+        <button id="inject-btn">Inject Dynamic Form</button>
+    </div>
+
+    <script>
+        document.getElementById('inject-btn').onclick = () => {
+            const container = document.getElementById('dynamic-container');
+            const formHtml = `
+                <form id="dynamic-form" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 20px;">
+                    <div class="form-group">
+                        <label for="d-skills">Your Tech Stack</label>
+                        <textarea id="d-skills" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="d-edu">Education</label>
+                        <input type="text" id="d-edu">
+                    </div>
+                </form>
+            `;
+            container.insertAdjacentHTML('beforeend', formHtml);
+            document.getElementById('inject-btn').style.display = 'none';
+        };
+    </script>
+</body>
+
+</html>
